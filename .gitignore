@@ -1,5 +1,6 @@
 /temp
-.env
 faiss_db
 *.pdf
 *.json
+.env
+/faiss_dbs

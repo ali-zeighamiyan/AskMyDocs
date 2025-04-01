@@ -35,7 +35,7 @@ class LLM:
                                                         ("human", human)])
         self.filter = None
         if not os.path.exists("log.json"):
-            self.log = {"EmbeddedDocsName":[]}
+            self.log = {"EmbeddedDocsName":{}}
             self.save_log()
         else:
             self.load_log()
@@ -52,8 +52,8 @@ class LLM:
         ai_message = chain.invoke(resume)
         return ai_message.content
     
-    def load_docs(self, selected_docs_name):
-        file_paths = [os.path.join("temp", f_name) for f_name in selected_docs_name if f_name not in self.log["EmbeddedDocsName"]]
+    def load_docs(self, selected_docs_name, cluster_name):
+        file_paths = [os.path.join("temp", cluster_name, f_name) for f_name in selected_docs_name if f_name not in self.log["EmbeddedDocsName"].get(cluster_name, [])]
         self.documents = []
         for file_path in file_paths:
             if file_path.endswith(".pdf"):
@@ -66,7 +66,11 @@ class LLM:
             docs_with_metadata = [Document(page_content=doc.page_content,  metadata={"source": file_name}) 
                                   for doc in docs]
             self.documents.extend(docs_with_metadata)
-            self.log["EmbeddedDocsName"].append(file_name)
+            if cluster_name not in self.log["EmbeddedDocsName"]:
+                self.log["EmbeddedDocsName"][cluster_name] = [file_name]
+            else:
+                self.log["EmbeddedDocsName"][cluster_name].append(file_name)
+                
         
     def update_rag(self):
         self.rag = RunnableParallel(
@@ -121,10 +125,11 @@ class LLM:
             self.final_faiss_db.merge_from(db)
         return self.final_faiss_db
     
-    def save_db(self):
-        self.final_faiss_db.save_local(os.path.join(directory_path, "faiss_db"))
-    def load_db(self):
-        loaded_db = FAISS.load_local("faiss_db", self.embedding_model, allow_dangerous_deserialization=True)
+    def save_db(self, cluster_name):
+        self.final_faiss_db.save_local(os.path.join(directory_path, "faiss_dbs", cluster_name))
+    def load_db(self, cluster_name):
+        db_path = os.path.join(directory_path, "faiss_dbs", cluster_name)
+        loaded_db = FAISS.load_local(db_path, self.embedding_model, allow_dangerous_deserialization=True)
         if self.final_faiss_db:
             self.final_faiss_db.merge_from(loaded_db)
         else:
@@ -133,22 +138,22 @@ class LLM:
     def get_retriever(self, filter=None):
         self.retriever = self.final_faiss_db.as_retriever(search_kwargs={"k": 5, "filter":{"source":filter}})
     
-    def process_new_docs(self, new_docs_name):
-        self.load_docs(new_docs_name)
+    def process_new_docs(self, new_docs_name, cluster_name):
+        self.load_docs(new_docs_name, cluster_name)
         text_chunks = self.split_documents(self.documents)
         splitted_chunks = self.split_chunks_to_max_limited(text_chunks)
         self.build_db(splitted_chunks)
         
-    def run(self, question, selected_docs_name):
-        new_docs_name = set(selected_docs_name) - set(self.log["EmbeddedDocsName"])
-        common_docs_name = set(selected_docs_name).intersection(self.log["EmbeddedDocsName"])
+    def run(self, question, cluster_name, selected_docs_name):
+        new_docs_name = set(selected_docs_name) - set(self.log["EmbeddedDocsName"].get(cluster_name, []))
+        common_docs_name = set(selected_docs_name).intersection(self.log["EmbeddedDocsName"].get(cluster_name, []))
         if new_docs_name : 
             print("new docs ... processing ....")
-            self.process_new_docs(new_docs_name)
+            self.process_new_docs(new_docs_name, cluster_name)
         if common_docs_name:
             print("old docs .... loading ...")
-            self.load_db()
-        self.save_db()
+            self.load_db(cluster_name)
+        self.save_db(cluster_name)
         print("DB has saved ... ")
         self.get_retriever(selected_docs_name)
         self.update_rag()

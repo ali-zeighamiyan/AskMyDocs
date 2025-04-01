@@ -1,56 +1,63 @@
 import streamlit as st
 import os
 from llm import LLM
-
-llm_model = LLM()
-# ---- Streamlit UI ----
 st.set_page_config(page_title="AI Document Assistant", layout="wide")
 
-st.title("📄 AI-Powered Document Assistant")
-import streamlit as st
-import os
-from io import BytesIO
-from PyPDF2 import PdfReader
-import docx
-selected_docs = []
+# Define base directory for storage
+BASE_DIR = "temp"
+llm_model = LLM()
 
-directory_path = os.path.dirname(os.path.abspath("__file__"))
-os.makedirs("temp", exist_ok=True)
+# Ensure the directory exists
+os.makedirs(BASE_DIR, exist_ok=True)
 
-def save_file(file):
-    temp_path = os.path.join("temp", file.name)
-    with open(temp_path, "wb") as f:
-        f.write(file.getbuffer())
-        
-# Streamlit UI
-st.title("Upload and Select Documents")
+# Function to save uploaded file to a specific cluster
+def save_file(uploaded_file, cluster_name):
+    cluster_path = os.path.join(BASE_DIR, cluster_name)
+    os.makedirs(cluster_path, exist_ok=True)  # Create cluster directory if not exists
 
-# Upload files
-uploaded_files = st.file_uploader("Upload Documents", type=["txt", "pdf", "docx"], accept_multiple_files=True)
-existence_files_name = os.listdir("temp")
-docs_names = existence_files_name
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        docs_names.append(uploaded_file.name)
-        save_file(uploaded_file)
+    file_path = os.path.join(cluster_path, uploaded_file.name)
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
 
-if docs_names:
-    selected_docs = st.multiselect("Select Documents", options=docs_names)
+# Load existing clusters
+existing_clusters = [f for f in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, f))]
 
-if selected_docs:
-    print(selected_docs)
-    # st.write("Selected Documents Content:")
-    # for doc in selected_docs:
-    #     st.write(f"**{doc}**")
-    #     st.text_area("", doc_contents[doc], height=200)
+# Let users select or create a cluster
+cluster_name = st.text_input("Enter cluster name (or select existing one):")
 
-    # User input for question
-    question = st.text_input("Ask a question about the selected documents:")
+if existing_clusters:
+    selected_cluster = st.selectbox("Or select an existing cluster:", existing_clusters)
+    if selected_cluster:
+        cluster_name = selected_cluster
 
-    if st.button("Submit"):
-        st.write(f"You asked: {question}")
-        ai_ans = llm_model.run(question, selected_docs)
-        st.write(f"Processing... {ai_ans}")
-        
+if cluster_name:
+    st.write(f"Selected Cluster: {cluster_name}")
 
+    # Upload files
+    uploaded_files = st.file_uploader("Upload Documents", type=["txt", "pdf", "docx"], accept_multiple_files=True)
 
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            save_file(uploaded_file, cluster_name)
+        st.success("Files uploaded successfully!")
+
+    # List files in selected cluster
+    cluster_path = os.path.join(BASE_DIR, cluster_name)
+    if os.path.exists(cluster_path):
+        docs_names = os.listdir(cluster_path)
+    else:
+        docs_names = []
+
+    if docs_names:
+        selected_docs = st.multiselect("Select Documents", options=docs_names)
+
+        if selected_docs:
+            st.write("You selected:", " ,".join(selected_docs))
+
+            # User input for question
+            question = st.text_input("Ask a question about the selected documents:")
+
+            if st.button("Submit"):
+                st.write(f"You asked: {question}")
+                ai_ans = llm_model.run(question, cluster_name, selected_docs)
+                st.write(f"Processing... {ai_ans}")
