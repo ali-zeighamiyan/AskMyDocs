@@ -1,5 +1,5 @@
 
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_groq import ChatGroq
 from langchain_core.output_parsers import StrOutputParser
@@ -14,6 +14,10 @@ import os
 import ntpath
 import json
 from langchain.docstore.document import Document
+from langchain_core.messages import HumanMessage, AIMessage
+import streamlit as st
+
+
 
 
 load_dotenv()
@@ -26,12 +30,16 @@ class LLM:
     def __init__(self):        
         self.llm = ChatGroq(api_key=groq_api_key, temperature=0, model_name="llama-3.3-70b-specdec")
         self.embedding_model = CohereEmbeddings(cohere_api_key=cohere_api_key, model="embed-english-light-v3.0")
-        
+        if "his_messages" not in st.session_state:
+            st.session_state.his_messages = []
+
+        self.his_messages = st.session_state.his_messages  # Keep messages persistent
         system = """You are a helpful assistant who answers only based on its context
                     context : {context}"""
 
         human = """{question}"""
-        self.prompt = ChatPromptTemplate.from_messages([("system", system), 
+        self.prompt = ChatPromptTemplate.from_messages([("system", system),
+                                                        MessagesPlaceholder(variable_name="chat_history"),
                                                         ("human", human)])
         self.filter = None
         if not os.path.exists("log.json"):
@@ -77,12 +85,16 @@ class LLM:
             {
             "context": itemgetter("question") | self.retriever,
             "question": RunnablePassthrough(),
+            "chat_history": lambda x : self.his_messages
             }
             )
     
     def get_model_prediction_with_rag(self, question):
         chain = self.rag | self.prompt | self.llm.with_config(temperature=0.1) | StrOutputParser()
         ai_message = chain.invoke({"question":question})
+        self.his_messages.append(HumanMessage(content=question))
+        self.his_messages.append(AIMessage(content=ai_message))
+        print(self.his_messages)
         return ai_message
     
     def split_documents(self, documents):
