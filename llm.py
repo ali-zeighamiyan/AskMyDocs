@@ -6,7 +6,7 @@ from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from operator import itemgetter
-from langchain_cohere import CohereEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 import time
@@ -15,22 +15,17 @@ import ntpath
 import json
 from langchain.docstore.document import Document
 from langchain_core.messages import HumanMessage, AIMessage
-import streamlit as st
 
 load_dotenv()
-groq_api_key = os.getenv("Groq_API_KE")
-cohere_api_key = os.getenv("Cohere_API_KEY")
+groq_api_key = os.getenv("Groq_API_KEY")
+aval_ai_api_key = os.getenv("Aval_AI_API_KEY")
 
 directory_path = os.path.dirname(os.path.abspath("__file__"))
 
 class LLM:
     def __init__(self, user_id="default"):        
         self.llm = ChatGroq(api_key=groq_api_key, temperature=0, model_name="llama-3.3-70b-specdec")
-        self.embedding_model = CohereEmbeddings(cohere_api_key=cohere_api_key, model="embed-english-light-v3.0")
-        if "his_messages" not in st.session_state:
-            st.session_state.his_messages = []
-
-        self.his_messages = st.session_state.his_messages  # Keep messages persistent
+        self.embedding_model = OpenAIEmbeddings(api_key=aval_ai_api_key, model="text-embedding-3-small", base_url="https://api.avalai.ir/v1")
         system = """You are a helpful assistant who answers only based on its context
                     context : {context}"""
 
