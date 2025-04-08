@@ -1,1 +1,0 @@
-this .ipynb files has ran on google colab and then downloaded to local
