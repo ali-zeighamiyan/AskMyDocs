@@ -8,7 +8,8 @@ from llm import LLM
 
 
 TOKEN = "6929830229:AAEXbYO97fey0HwecRuIPFTLXYT-WxzgigI"
-BASE_DIR = "temp"
+directory_path = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.join(directory_path, "temp")
 
 
 os.makedirs(BASE_DIR, exist_ok=True)

@@ -16,11 +16,12 @@ import json
 from langchain.docstore.document import Document
 from langchain_core.messages import HumanMessage, AIMessage
 
+
 load_dotenv()
 groq_api_key = os.getenv("Groq_API_KEY")
 aval_ai_api_key = os.getenv("Aval_AI_API_KEY")
 
-directory_path = os.path.dirname(os.path.abspath("__file__"))
+directory_path = os.path.dirname(os.path.abspath(__file__))
 
 class LLM:
     def __init__(self, user_id="default"):        
@@ -35,6 +36,7 @@ class LLM:
                                                         ("human", human)])
         self.filter = None
         self.user_id = user_id
+        self.his_messages = []
         if not os.path.exists("log.json"):
             self.log = {self.user_id: {"EmbeddedDocsName":{}}}
             self.save_log()
@@ -43,10 +45,10 @@ class LLM:
             
         self.final_faiss_db = None
     def save_log(self):
-        with open("log.json", "w") as file:
+        with open(os.path.join(directory_path, "log.json"), "w") as file:
             file.write(json.dumps(self.log))
     def load_log(self):
-        with open("log.json", "r") as file:
+        with open(os.path.join(directory_path, "log.json"), "r") as file:
             self.log = json.loads(file.read())
     def get_model_prediction(self, resume):
         chain = self.prompt | self.chat | StrOutputParser()
@@ -54,7 +56,7 @@ class LLM:
         return ai_message.content
     
     def load_docs(self, selected_docs_name, cluster_name):
-        file_paths = [os.path.join("temp", self.user_id, cluster_name, f_name) for f_name in selected_docs_name if f_name not
+        file_paths = [os.path.join(directory_path, "temp", self.user_id, cluster_name, f_name) for f_name in selected_docs_name if f_name not
                       in self.log[self.user_id]["EmbeddedDocsName"].get(cluster_name, [])]
         self.documents = []
         for file_path in file_paths:
@@ -137,7 +139,10 @@ class LLM:
         db_path = os.path.join(directory_path, "faiss_dbs", self.user_id, cluster_name)
         loaded_db = FAISS.load_local(db_path, self.embedding_model, allow_dangerous_deserialization=True)
         if self.final_faiss_db:
-            self.final_faiss_db.merge_from(loaded_db)
+            if set(self.final_faiss_db.index_to_docstore_id.values()).intersection(set(loaded_db.index_to_docstore_id.values())) == set():
+                self.final_faiss_db.merge_from(loaded_db)
+            else:
+                print("the same db, can't merge ...")
         else:
             self.final_faiss_db = loaded_db
 
