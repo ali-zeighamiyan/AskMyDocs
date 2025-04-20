@@ -4,3 +4,4 @@ faiss_db
 *.json
 .env
 /faiss_dbs
+*.ipynb

@@ -5,3 +5,4 @@ langchain_openai
 faiss-cpu
 python-telegram-bot
 pypdf
+docx2txt
